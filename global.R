@@ -1,9 +1,6 @@
 # Variables that can be put on the x and y axes
 axis_vars <- c(
-  "Tomato Meter" = "Meter",
-  "Numeric Rating" = "Rating",
-  "Number of reviews" = "Reviews",
-  "Dollars at box office" = "BoxOffice",
-  "Year" = "Year",
-  "Length (minutes)" = "Runtime"
+  "Lag Days" = "DAYS_LS_RPTD",
+  "Total Loss" = "CTTD_TOT_RPTD_A"#,
+#  "Loss Year" = "Year"
 )

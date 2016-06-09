@@ -11,7 +11,9 @@ You may need to restart R to make sure the newly-installed packages work properl
 After all these packages are installed, you can run this app by entering the directory, and then running the following in R:
 
 ```s
-shiny::runApp()
+> library(shiny)
+> apppath = "C:\\Users\\u041018\\Documents\\GitHub\\wc_financial"
+> shiny::runApp(appDir = apppath)
 ```
 
 read in tab dlm text file use

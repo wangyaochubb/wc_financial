@@ -3,15 +3,17 @@ library(dplyr)
 if (FALSE) library(RSQLite)
 
 # Set up handles to database tables on app start
-db <- src_sqlite("gbwc_fin.sqlite")
+db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\gbwc_fin.sqlite")
 CPfindb <- tbl(db, "gbwc_financial")
 
 # create loss year field
-mutate(CPfindb,LS_Y = as.numeric(as.Date(LS_D, "%Y")))
+# mutate(CPfindb,LS_Y = as.numeric(as.Date(LS_D, "%Y-%m-%d")))
 
 # select specified columns
-all_fin_records <- select(CPfindb, CLM_ID=CLM_SRC_SYS_UNQ_ID, LS_D, LS_Y, LS_RPTD_D, CLM_FILE_STAT_C, CLMOC_CLSD_D,
-         CLMOC_REOPN_D, NA_INSD_NA, DAYS_LS_RPTD, CTTD_TOT_RPTD_A)
+all_fin_records <- select(CPfindb, CLM_SRC_SYS_UNQ_ID, LS_D,LS_YR, CLM_FILE_STAT_NA, 
+          NA_INSD_NA, DAYS_LS_RPTD, CTTD_TOT_RPTD_A
+#         ,LS_RPTD_D,CLMOC_CLSD_D,CLMOC_REOPN_D
+)
           
 
 
@@ -19,24 +21,17 @@ shinyServer(function(input, output, session) {
 
   # Filter the claim records, returning a data frame
   fin_records <- reactive({
-    # Due to dplyr issue #318, we need temp variables for input values
-    CLM_FILE_STAT_C <- input$CLM_FILE_STAT_C
-     min_ls_y <- input$loss_year[1]
-     max_ls_y <- input$loss_year[2]
+    # Due to dplyr issue #318, we need temp variables for input 
+     min_ls_yr <- input$loss_year[1]
+     max_ls_yr <- input$loss_year[2]
 
     # Apply filters
-    w <- all_records %>%
-      filter(
-         LS_Y >= min_ls_y,
-         LS_Y <= max_ls_y
-      ) %>%
-      arrange(LS_Y)
+    w <- filter(all_fin_records,  LS_YR >=min_ls_yr & LS_YR <= max_ls_yr)
 
     # Optional: filter by Claim file status
     if (input$claim_file_status != "All") {
-      claim_status <- paste0("%", CLM_FILE_STAT_C, "%")
-      w <- w %>% filter(claim_file_status %like% claim_status)
-      # w <- w %>% filter(CLM_FILE_STAT_C  %like% claim_status)
+      claim_status <- toupper(input$claim_file_status)
+      w <-  filter(w, toupper(CLM_FILE_STAT_NA) == claim_status)%>%arrange(LS_YR)
     }
     # # Optional: filter by director
     # if (!is.null(input$director) && input$director != "") {
@@ -75,24 +70,30 @@ shinyServer(function(input, output, session) {
   }
 
   # A reactive expression with the ggvis plot
-  # vis <- reactive({
-  #   # Lables for axes
-  #   xvar_name <- names(axis_vars)[axis_vars == input$xvar]
-  #   yvar_name <- names(axis_vars)[axis_vars == input$yvar]
-  # 
-  #   # Normally we could do something like props(x = ~BoxOffice, y = ~Reviews),
-  #   # but since the inputs are strings, we need to do a little more work.
-  #   xvar <- prop("x", as.symbol(input$xvar))
-  #   yvar <- prop("y", as.symbol(input$yvar))
-  # 
-  #   fin_records %>%
-  #     ggvis(x = xvar, y = yvar) %>%
-  #     layer_points(size := 50, size.hover := 200,
-  #       fillOpacity := 0.2, fillOpacity.hover := 0.5, key := ~input$CLM_SRC_SYS_UNQ_ID) %>%add_tooltip(records_tooltip, "hover") %>%add_axis("x", title = xvar_name) %>%add_axis("y", title = yvar_name) #%>%
-  #     # add_legend("stroke", title = "Won Oscar", values = c("Yes", "No")) %>%  scale_nominal("stroke", domain = c("Yes", "No"),range = c("orange", "#aaa")) %>% set_options(width = 500, height = 500)
-  # })
-  # 
-  # vis %>% bind_shiny("plot1")
+  vis <- reactive({
+    # Lables for axes
+    xvar_name <- names(axis_vars)[axis_vars == input$xvar]
+    yvar_name <- names(axis_vars)[axis_vars == input$yvar]
+
+    # Normally we could do something like props(x = ~BoxOffice, y = ~Reviews),
+    # but since the inputs are strings, we need to do a little more work.
+    xvar <- prop("x", as.symbol(input$xvar))
+    yvar <- prop("y", as.symbol(input$yvar))
+
+    fin_records %>%
+      ggvis(x = xvar, y = yvar) %>%
+      layer_points(size := 50, size.hover := 200,
+        fillOpacity := 0.2, fillOpacity.hover := 0.5, 
+        stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
+      add_tooltip(records_tooltip, "hover") %>%
+      add_axis("x", title = xvar_name,format="####") %>%
+      add_axis("y", title = yvar_name) %>%
+      add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
+      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "orange","#aaa")) %>% 
+      set_options(width = 500, height = 500)
+  })
+
+  vis %>% bind_shiny("plot1")
 
   output$num_fin_records<- renderText({ nrow(fin_records()) })
 })

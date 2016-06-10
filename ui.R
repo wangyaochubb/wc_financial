@@ -11,7 +11,7 @@ actionLink <- function(inputId, ...) {
 shinyUI(fluidPage(
   titlePanel("GB WC data explorer"),
   fluidRow(
-    column(4,
+    column(3,
       wellPanel(
         h4("Filter panel"),
         selectInput("claim_file_status", "Claim file status", c("All","Closed","Open")),
@@ -22,7 +22,7 @@ shinyUI(fluidPage(
 #        textInput("cast", "Cast names contains (e.g. Tom Hanks)")
       ),
       wellPanel(
-        selectInput("xvar", "X-axis variable", axis_vars, selected = "DAYS_LS_RPTD"),
+        selectInput("xvar", "X-axis variable", axis_vars, selected = "LS_YR"),
         selectInput("yvar", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A")#,
       #   tags$small(paste0(
       #     "Note: The Tomato Meter is the proportion of positive reviews",
@@ -31,12 +31,10 @@ shinyUI(fluidPage(
       #     " (for example, 3 out of 4 stars)."))
        )
      ),
-     column(8,
-      #ggvisOutput("plot1"),
+     column(9,
+      ggvisOutput("plot1"),
       wellPanel(
-        span("Number of claims selected:",
-          textOutput("num_fin_records")
-        )
+        span("Number of claims selected:", textOutput("num_fin_records"))
       )
     )
   )

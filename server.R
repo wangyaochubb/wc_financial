@@ -3,7 +3,7 @@ library(dplyr)
 if (FALSE) library(RSQLite)
 
 # Set up handles to database tables on app start
-db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\gbwc_fin.sqlite")
+db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\xiaoyun\\gbwc_fin.sqlite")
 CPfindb <- tbl(db, "gbwc_financial")
 
 # create loss year field

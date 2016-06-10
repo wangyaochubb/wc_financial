@@ -8,34 +8,39 @@ actionLink <- function(inputId, ...) {
          ...)
 }
 
-shinyUI(fluidPage(
-  titlePanel("GB WC data explorer"),
-  fluidRow(
-    column(3,
-      wellPanel(
-        h4("Filter panel"),
-        selectInput("claim_file_status", "Claim file status", c("All","Closed","Open")),
-        sliderInput("loss_year", "Loss year", 1987, 2016, value = c(2007, 2016), sep = "")#,
-#        sliderInput("oscars", "Minimum number of Oscar wins (all categories)", 0, 4, 0, step = 1),
-#        sliderInput("boxoffice", "Dollars at Box Office (millions)", 0, 800, c(0, 800), step = 1),
-#        textInput("director", "Director name contains (e.g., Miyazaki)"),
-#        textInput("cast", "Cast names contains (e.g. Tom Hanks)")
-      ),
-      wellPanel(
-        selectInput("xvar", "X-axis variable", axis_vars, selected = "LS_YR"),
-        selectInput("yvar", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A")#,
-      #   tags$small(paste0(
-      #     "Note: The Tomato Meter is the proportion of positive reviews",
-      #     " (as judged by the Rotten Tomatoes staff), and the Numeric rating is",
-      #     " a normalized 1-10 score of those reviews which have star ratings",
-      #     " (for example, 3 out of 4 stars)."))
-       )
-     ),
-     column(9,
-      ggvisOutput("plot1"),
-      wellPanel(
-        span("Number of claims selected:", textOutput("num_fin_records"))
-      )
-    )
+shinyUI(pageWithSidebar(
+  headerPanel("GB WC data explorer"),
+  sidebarPanel(
+    # h4("Filter panel"),
+    selectInput("claim_file_status", "Claim file status", c("All","Closed","Open"),selected = "Closed"),
+    sliderInput("loss_year", "Loss year", 1987, 2016, value = c(2005, 2016), sep = ""),
+    radioButtons("total_loss", 
+                 "Total incurred loss", 
+                 list("All Claims" = "0,1000000000",
+                      "Less than $5,000" = "0,5000",
+                      "$5,000 to $10,000" = "5000,10000",
+                      "$10,000 to $50,000" = "10000,50000",
+                      "$50,000 to $100,000" = "50000,100000",
+                      "$100,000 to $500,000" = "100000,500000",
+                      "$500,000 to $1,000,000" = "500000,1000000",
+                      "Greater than $1,000,000" = "1000000,1000000000"
+                      ),
+                 selected = "100000,500000"),
+    # sliderInput("boxoffice", "Dollars at Box Office (millions)", 0, 800, c(0, 800), step = 1),
+    textInput("insured_name", "Insured name", placeholder = "e.g. COMAIR, INC."),
+    # actionButton("submit","Submit"),
+    selectInput("xvar1", "X-axis variable", axis_vars, selected = "LS_YR"),
+    selectInput("yvar1", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A"),
+    tags$small(paste0("Note: The total loss is up to current reporting period"))
+  ),
+mainPanel(
+  tabsetPanel(
+    tabPanel("Plot",ggvisOutput("plot1")),
+    tabPanel("Summary",ggvisOutput("plot2")),
+    tabPanel("Table", dataTableOutput("table1"))
+  ),
+  wellPanel(
+    span("Number of claims selected:", textOutput("num_fin_records"))
   )
+)
 ))

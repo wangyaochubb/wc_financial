@@ -14,8 +14,6 @@ all_fin_records <- select(CPfindb, CLM_SRC_SYS_UNQ_ID, LS_D,LS_YR, CLM_FILE_STAT
           NA_INSD_NA, DAYS_LS_RPTD, CTTD_TOT_RPTD_A
 #         ,LS_RPTD_D,CLMOC_CLSD_D,CLMOC_REOPN_D
 )
-          
-
 
 shinyServer(function(input, output, session) {
 
@@ -25,32 +23,38 @@ shinyServer(function(input, output, session) {
      min_ls_yr <- input$loss_year[1]
      max_ls_yr <- input$loss_year[2]
 
+     # Radio buttion: filter by total incurred loss
+     bracket <- input$total_loss
+     brlbd <- as.numeric(strsplit(bracket,",")[[1]][1])
+     brubd <- as.numeric(strsplit(bracket,",")[[1]][2])
+     
     # Apply filters
-    w <- filter(all_fin_records,  LS_YR >=min_ls_yr & LS_YR <= max_ls_yr)
+    w <- filter(all_fin_records,LS_YR >=min_ls_yr & LS_YR <= max_ls_yr,CTTD_TOT_RPTD_A>=brlbd & CTTD_TOT_RPTD_A <= brubd)
+    w <- group_by(w,LS_YR)
+#     w_smr <- summarise(w,
+#                    num_clm_yr = n(),
+#                    avgloss_clm_yr = mean(CTTD_TOT_RPTD_A)
+#     )
 
     # Optional: filter by Claim file status
     if (input$claim_file_status != "All") {
       claim_status <- toupper(input$claim_file_status)
-      w <-  filter(w, toupper(CLM_FILE_STAT_NA) == claim_status)%>%arrange(LS_YR)
+      w <-  filter(w, toupper(CLM_FILE_STAT_NA) == claim_status)#%>%arrange(LS_YR)
     }
-    # # Optional: filter by director
-    # if (!is.null(input$director) && input$director != "") {
-    #   director <- paste0("%", input$director, "%")
-    #   w <- w %>% filter(Director %like% director)
-    # }
-    # # Optional: filter by cast member
-    # if (!is.null(input$cast) && input$cast != "") {
-    #   cast <- paste0("%", input$cast, "%")
-    #   w <- w %>% filter(Cast %like% cast)
-    # }
+    
+    # Optional: filter by insured name
+    if (!is.null(input$insured_name) && input$insured_name != "") {
+      insured_name <- paste0("%", input$insured_name, "%")
+      w <- w %>% filter(NA_INSD_NA %like% insured_name)
+    }
+    # Will not get data until here
     w <- collect(w)
     w <- as.data.frame(w)
 
-    # Add column which says whether the movie won any Oscars
-    # Be a little careful in case we have a zero-row data frame
-    w$NUM_CLM <- character(nrow(w))
-    # w$has_oscar[w$Oscars == 0] <- "No"
-    # w$has_oscar[w$Oscars >= 1] <- "Yes"
+    # Add columns which contains number of the claims and
+    # average loss per loss year
+    # w$NUM_CLM<- 
+    # w$MV_AVG <- 
     w
   })
 
@@ -64,36 +68,72 @@ shinyServer(function(input, output, session) {
     records <- selected_fin_records[selected_fin_records$CLM_SRC_SYS_UNQ_ID == x$CLM_SRC_SYS_UNQ_ID, ]
 
     paste0("<b>", records$NA_INSD_NA, "</b><br>",
-      records$LS_D, "<br>",
-      "$", format(records$CTTD_TOT_RPTD_A, big.mark = ",", scientific = FALSE)
+      "Loss Date:" ,records$LS_D, "<br>",
+      "Claim File Status: ",records$CLM_FILE_STAT_NA, "<br>",
+      "Total Loss: ","$", format(records$CTTD_TOT_RPTD_A, big.mark = ",", scientific = FALSE)
     )
   }
 
-  # A reactive expression with the ggvis plot
-  vis <- reactive({
+  # reactive expression with the ggvis plot
+  plot1 <- reactive({
     # Lables for axes
-    xvar_name <- names(axis_vars)[axis_vars == input$xvar]
-    yvar_name <- names(axis_vars)[axis_vars == input$yvar]
+    xvar1_name <- names(axis_vars)[axis_vars == input$xvar1]
+    yvar1_name <- names(axis_vars)[axis_vars == input$yvar1]
 
     # Normally we could do something like props(x = ~BoxOffice, y = ~Reviews),
     # but since the inputs are strings, we need to do a little more work.
-    xvar <- prop("x", as.symbol(input$xvar))
-    yvar <- prop("y", as.symbol(input$yvar))
+    xvar1 <- prop("x", as.symbol(input$xvar1))
+    yvar1 <- prop("y", as.symbol(input$yvar1))
 
     fin_records %>%
-      ggvis(x = xvar, y = yvar) %>%
+      ggvis(x = xvar1, y = yvar1) %>%
       layer_points(size := 50, size.hover := 200,
         fillOpacity := 0.2, fillOpacity.hover := 0.5, 
         stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
       add_tooltip(records_tooltip, "hover") %>%
-      add_axis("x", title = xvar_name,format="####") %>%
-      add_axis("y", title = yvar_name) %>%
+      add_axis("x", title = xvar1_name,format="####") %>%
+      add_axis("y", title = yvar1_name) %>%
       add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
-      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "orange","#aaa")) %>% 
-      set_options(width = 500, height = 500)
+      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>% 
+      set_options(width = 750, height = 600)
   })
 
-  vis %>% bind_shiny("plot1")
+  plot1 %>% bind_shiny("plot1")
+  
+  plot2 <- reactive({
+    # Lables for axes
+    xvar2_name <- names(axis_vars)[axis_vars == input$xvar1]
+    yvar2_name <- names(axis_vars)[axis_vars == input$yvar1]
+    
+    # Normally we could do something like
+    #     xvar2 <- props(x = ~xvar1)
+    #     yvar2 <- props(y = ~yvar1)
+    # but since the inputs are strings, we need to do a little more work.
 
+    xvar2 <- prop("x", as.symbol(input$xvar1))
+    yvar2 <- prop("y", as.symbol(input$yvar1))
+    
+    fin_records %>%
+      ggvis(x = xvar2, y = yvar2) %>%
+      layer_points(size := 50, size.hover := 200,
+                   fillOpacity := 0.2, fillOpacity.hover := 0.5, 
+                   stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
+      add_tooltip(records_tooltip, "hover") %>%
+      add_axis("x", title = xvar2_name,format="####") %>%
+      add_axis("y", title = yvar2_name) %>%
+      add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
+      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>% 
+      set_options(width = 750, height = 600)
+  })
+  
+  plot2 %>% bind_shiny("plot2")
+  
   output$num_fin_records<- renderText({ nrow(fin_records()) })
+  
+  # note that on ui.R we use dataTableOutput$table1
+  output$table1 <- renderDataTable(fin_records(),
+                                   options = list(
+                                     pageLength = 15
+                                   )
+  )
 })

@@ -3,82 +3,69 @@ library(dplyr)
 if (FALSE) library(RSQLite)
 
 # Set up handles to database tables on app start
-db <- src_sqlite("movies.db")
-omdb <- tbl(db, "omdb")
-tomatoes <- tbl(db, "tomatoes")
+db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\gbwc_fin.sqlite")
+CPfindb <- tbl(db, "gbwc_financial")
 
-# Join tables, filtering out those with <10 reviews, and select specified columns
-all_movies <- inner_join(omdb, tomatoes, by = "ID") %>%
-  filter(Reviews >= 10) %>%
-  select(ID, imdbID, Title, Year, Rating_m = Rating.x, Runtime, Genre, Released,
-    Director, Writer, imdbRating, imdbVotes, Language, Country, Oscars,
-    Rating = Rating.y, Meter, Reviews, Fresh, Rotten, userMeter, userRating, userReviews,
-    BoxOffice, Production)
+# create loss year field
+# mutate(CPfindb,LS_Y = as.numeric(as.Date(LS_D, "%Y-%m-%d")))
+
+# select specified columns
+all_fin_records <- select(CPfindb, CLM_SRC_SYS_UNQ_ID, LS_D,LS_YR, CLM_FILE_STAT_NA, 
+          NA_INSD_NA, DAYS_LS_RPTD, CTTD_TOT_RPTD_A
+#         ,LS_RPTD_D,CLMOC_CLSD_D,CLMOC_REOPN_D
+)
+          
 
 
 shinyServer(function(input, output, session) {
 
-  # Filter the movies, returning a data frame
-  movies <- reactive({
-    # Due to dplyr issue #318, we need temp variables for input values
-    reviews <- input$reviews
-    oscars <- input$oscars
-    minyear <- input$year[1]
-    maxyear <- input$year[2]
-    minboxoffice <- input$boxoffice[1] * 1e6
-    maxboxoffice <- input$boxoffice[2] * 1e6
+  # Filter the claim records, returning a data frame
+  fin_records <- reactive({
+    # Due to dplyr issue #318, we need temp variables for input 
+     min_ls_yr <- input$loss_year[1]
+     max_ls_yr <- input$loss_year[2]
 
     # Apply filters
-    m <- all_movies %>%
-      filter(
-        Reviews >= reviews,
-        Oscars >= oscars,
-        Year >= minyear,
-        Year <= maxyear,
-        BoxOffice >= minboxoffice,
-        BoxOffice <= maxboxoffice
-      ) %>%
-      arrange(Oscars)
+    w <- filter(all_fin_records,  LS_YR >=min_ls_yr & LS_YR <= max_ls_yr)
 
-    # Optional: filter by genre
-    if (input$genre != "All") {
-      genre <- paste0("%", input$genre, "%")
-      m <- m %>% filter(Genre %like% genre)
+    # Optional: filter by Claim file status
+    if (input$claim_file_status != "All") {
+      claim_status <- toupper(input$claim_file_status)
+      w <-  filter(w, toupper(CLM_FILE_STAT_NA) == claim_status)%>%arrange(LS_YR)
     }
-    # Optional: filter by director
-    if (!is.null(input$director) && input$director != "") {
-      director <- paste0("%", input$director, "%")
-      m <- m %>% filter(Director %like% director)
-    }
-    # Optional: filter by cast member
-    if (!is.null(input$cast) && input$cast != "") {
-      cast <- paste0("%", input$cast, "%")
-      m <- m %>% filter(Cast %like% cast)
-    }
-
-
-    m <- as.data.frame(m)
+    # # Optional: filter by director
+    # if (!is.null(input$director) && input$director != "") {
+    #   director <- paste0("%", input$director, "%")
+    #   w <- w %>% filter(Director %like% director)
+    # }
+    # # Optional: filter by cast member
+    # if (!is.null(input$cast) && input$cast != "") {
+    #   cast <- paste0("%", input$cast, "%")
+    #   w <- w %>% filter(Cast %like% cast)
+    # }
+    w <- collect(w)
+    w <- as.data.frame(w)
 
     # Add column which says whether the movie won any Oscars
     # Be a little careful in case we have a zero-row data frame
-    m$has_oscar <- character(nrow(m))
-    m$has_oscar[m$Oscars == 0] <- "No"
-    m$has_oscar[m$Oscars >= 1] <- "Yes"
-    m
+    w$NUM_CLM <- character(nrow(w))
+    # w$has_oscar[w$Oscars == 0] <- "No"
+    # w$has_oscar[w$Oscars >= 1] <- "Yes"
+    w
   })
 
   # Function for generating tooltip text
-  movie_tooltip <- function(x) {
+  records_tooltip <- function(x) {
     if (is.null(x)) return(NULL)
-    if (is.null(x$ID)) return(NULL)
+    if (is.null(x$CLM_SRC_SYS_UNQ_ID)) return(NULL)
 
     # Pick out the movie with this ID
-    all_movies <- isolate(movies())
-    movie <- all_movies[all_movies$ID == x$ID, ]
+    selected_fin_records <- isolate(fin_records())
+    records <- selected_fin_records[selected_fin_records$CLM_SRC_SYS_UNQ_ID == x$CLM_SRC_SYS_UNQ_ID, ]
 
-    paste0("<b>", movie$Title, "</b><br>",
-      movie$Year, "<br>",
-      "$", format(movie$BoxOffice, big.mark = ",", scientific = FALSE)
+    paste0("<b>", records$NA_INSD_NA, "</b><br>",
+      records$LS_D, "<br>",
+      "$", format(records$CTTD_TOT_RPTD_A, big.mark = ",", scientific = FALSE)
     )
   }
 
@@ -93,21 +80,20 @@ shinyServer(function(input, output, session) {
     xvar <- prop("x", as.symbol(input$xvar))
     yvar <- prop("y", as.symbol(input$yvar))
 
-    movies %>%
+    fin_records %>%
       ggvis(x = xvar, y = yvar) %>%
       layer_points(size := 50, size.hover := 200,
-        fillOpacity := 0.2, fillOpacity.hover := 0.5,
-        stroke = ~has_oscar, key := ~ID) %>%
-      add_tooltip(movie_tooltip, "hover") %>%
-      add_axis("x", title = xvar_name) %>%
+        fillOpacity := 0.2, fillOpacity.hover := 0.5, 
+        stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
+      add_tooltip(records_tooltip, "hover") %>%
+      add_axis("x", title = xvar_name,format="####") %>%
       add_axis("y", title = yvar_name) %>%
-      add_legend("stroke", title = "Won Oscar", values = c("Yes", "No")) %>%
-      scale_nominal("stroke", domain = c("Yes", "No"),
-        range = c("orange", "#aaa")) %>%
+      add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
+      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "orange","#aaa")) %>% 
       set_options(width = 500, height = 500)
   })
 
   vis %>% bind_shiny("plot1")
 
-  output$n_movies <- renderText({ nrow(movies()) })
+  output$num_fin_records<- renderText({ nrow(fin_records()) })
 })

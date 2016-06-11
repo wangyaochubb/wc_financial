@@ -29,8 +29,8 @@ shinyUI(pageWithSidebar(
     # sliderInput("boxoffice", "Dollars at Box Office (millions)", 0, 800, c(0, 800), step = 1),
     textInput("insured_name", "Insured name", placeholder = "e.g. COMAIR, INC."),
     # actionButton("submit","Submit"),
-    selectInput("xvar1", "X-axis variable", axis_vars, selected = "LS_YR"),
-    selectInput("yvar1", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A"),
+    selectInput("xvar", "X-axis variable", axis_vars, selected = "LS_YR"),
+    selectInput("yvar", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A"),
     tags$small(paste0("Note: The total loss is up to current reporting period"))
   ),
 mainPanel(

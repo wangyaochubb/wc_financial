@@ -6,9 +6,6 @@ if (FALSE) library(RSQLite)
 db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\xiaoyun\\gbwc_fin.sqlite")
 CPfindb <- tbl(db, "gbwc_financial")
 
-# create loss year field
-# mutate(CPfindb,LS_Y = as.numeric(as.Date(LS_D, "%Y-%m-%d")))
-
 # select specified columns
 all_fin_records <- select(CPfindb, CLM_SRC_SYS_UNQ_ID, LS_D,LS_YR, CLM_FILE_STAT_NA, 
           NA_INSD_NA, DAYS_LS_RPTD, CTTD_TOT_RPTD_A
@@ -29,12 +26,11 @@ shinyServer(function(input, output, session) {
      brubd <- as.numeric(strsplit(bracket,",")[[1]][2])
      
     # Apply filters
-    w <- filter(all_fin_records,LS_YR >=min_ls_yr & LS_YR <= max_ls_yr,CTTD_TOT_RPTD_A>=brlbd & CTTD_TOT_RPTD_A <= brubd)
+    w <- filter(all_fin_records,
+                LS_YR >=min_ls_yr & LS_YR <= max_ls_yr,
+                CTTD_TOT_RPTD_A>=brlbd & CTTD_TOT_RPTD_A <= brubd
+                )
     w <- group_by(w,LS_YR)
-#     w_smr <- summarise(w,
-#                    num_clm_yr = n(),
-#                    avgloss_clm_yr = mean(CTTD_TOT_RPTD_A)
-#     )
 
     # Optional: filter by Claim file status
     if (input$claim_file_status != "All") {
@@ -50,16 +46,24 @@ shinyServer(function(input, output, session) {
     # Will not get data until here
     w <- collect(w)
     w <- as.data.frame(w)
-
-    # Add columns which contains number of the claims and
-    # average loss per loss year
-    # w$NUM_CLM<- 
-    # w$MV_AVG <- 
     w
   })
+  # summarize the data frame fin_records 
+  fin_records_sum <- reactive({
+    # note that to pass results to this reactive function
+    # we use fin_records() 
+    s <- group_by(fin_records(),LS_YR)
+    s <- summarise(s,
+                   NUMCLM_PER_YR = n(),
+                   AVGLS_PER_YR = mean(CTTD_TOT_RPTD_A,na.rm = TRUE),
+                   AVGDAYS_LS_RPTD = mean(DAYS_LS_RPTD,na.rm = TRUE)
+    )
+    s <- select(s,LS_YR,NUMCLM_PER_YR,AVGLS_PER_YR,AVGDAYS_LS_RPTD)
+    s
+  })
 
-  # Function for generating tooltip text
-  records_tooltip <- function(x) {
+  # Function for generating tooltip text for points chart
+  records_tooltip_points <- function(x) {
     if (is.null(x)) return(NULL)
     if (is.null(x$CLM_SRC_SYS_UNQ_ID)) return(NULL)
 
@@ -77,22 +81,22 @@ shinyServer(function(input, output, session) {
   # reactive expression with the ggvis plot
   plot1 <- reactive({
     # Lables for axes
-    xvar1_name <- names(axis_vars)[axis_vars == input$xvar1]
-    yvar1_name <- names(axis_vars)[axis_vars == input$yvar1]
+    xvar_name <- names(axis_vars)[axis_vars == input$xvar]
+    yvar_name <- names(axis_vars)[axis_vars == input$yvar]
 
     # Normally we could do something like props(x = ~BoxOffice, y = ~Reviews),
     # but since the inputs are strings, we need to do a little more work.
-    xvar1 <- prop("x", as.symbol(input$xvar1))
-    yvar1 <- prop("y", as.symbol(input$yvar1))
+    xvar <- prop("x", as.symbol(input$xvar))
+    yvar <- prop("y", as.symbol(input$yvar))
 
     fin_records %>%
-      ggvis(x = xvar1, y = yvar1) %>%
+      ggvis(x = xvar, y = yvar) %>%
       layer_points(size := 50, size.hover := 200,
         fillOpacity := 0.2, fillOpacity.hover := 0.5, 
         stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
-      add_tooltip(records_tooltip, "hover") %>%
-      add_axis("x", title = xvar1_name,format="####") %>%
-      add_axis("y", title = yvar1_name) %>%
+      add_tooltip(records_tooltip_points, "hover") %>%
+      add_axis("x", title = xvar_name,format="####") %>%
+      add_axis("y", title = yvar_name) %>%
       add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
       scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>% 
       set_options(width = 750, height = 600)
@@ -102,28 +106,21 @@ shinyServer(function(input, output, session) {
   
   plot2 <- reactive({
     # Lables for axes
-    xvar2_name <- names(axis_vars)[axis_vars == input$xvar1]
-    yvar2_name <- names(axis_vars)[axis_vars == input$yvar1]
-    
-    # Normally we could do something like
-    #     xvar2 <- props(x = ~xvar1)
-    #     yvar2 <- props(y = ~yvar1)
-    # but since the inputs are strings, we need to do a little more work.
+    xvar_name <- "Loss Year"
+    yvar_name <- "Number of claims"
 
-    xvar2 <- prop("x", as.symbol(input$xvar1))
-    yvar2 <- prop("y", as.symbol(input$yvar1))
+    xvar <- prop("x", as.symbol("LS_YR"))
+    yvar <- prop("y", as.symbol("NUMCLM_PER_YR"))
     
-    fin_records %>%
-      ggvis(x = xvar2, y = yvar2) %>%
-      layer_points(size := 50, size.hover := 200,
-                   fillOpacity := 0.2, fillOpacity.hover := 0.5, 
-                   stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
-      add_tooltip(records_tooltip, "hover") %>%
-      add_axis("x", title = xvar2_name,format="####") %>%
-      add_axis("y", title = yvar2_name) %>%
-      add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
-      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>% 
-      set_options(width = 750, height = 600)
+    fin_records_sum %>%
+      ggvis(x = xvar, y = yvar) %>%
+      layer_bars(opacity := 0.5,fill := "#3299CC") %>%
+      #add_tooltip(records_tooltip, "hover") %>%
+      add_axis("x", title = xvar_name,format="####",grid=FALSE) %>%
+      add_axis("y", title = yvar_name) %>%
+      # add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%
+      # scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>%
+      set_options(width = 450, height = 500)
   })
   
   plot2 %>% bind_shiny("plot2")

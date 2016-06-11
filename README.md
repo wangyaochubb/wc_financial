@@ -27,7 +27,7 @@ After all these packages are installed, you can run this app by entering the dir
 ```s
  library(shiny)
  apppath = "C:\\Users\\u041018\\Documents\\GitHub\\wc_financial"
- shiny::runApp(appDir = apppath)
+ shiny::runApp(appDir = apppath,display.mode = "showcase")
 ```
 
 read in tab dlm text file use

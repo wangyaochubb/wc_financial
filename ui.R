@@ -13,7 +13,7 @@ shinyUI(pageWithSidebar(
   sidebarPanel(
     # h4("Filter panel"),
     selectInput("claim_file_status", "Claim file status", c("All","Closed","Open"),selected = "Closed"),
-    sliderInput("loss_year", "Loss year", 1987, 2016, value = c(2005, 2016), sep = ""),
+    sliderInput("loss_year", "Loss year", 1987, 2016, value = c(2005, 2016), sep = "",step = 1),
     radioButtons("total_loss", 
                  "Total incurred loss", 
                  list("All Claims" = "0,1000000000",
@@ -26,21 +26,36 @@ shinyUI(pageWithSidebar(
                       "Greater than $1,000,000" = "1000000,1000000000"
                       ),
                  selected = "100000,500000"),
-    # sliderInput("boxoffice", "Dollars at Box Office (millions)", 0, 800, c(0, 800), step = 1),
     textInput("insured_name", "Insured name", placeholder = "e.g. COMAIR, INC."),
     # actionButton("submit","Submit"),
     selectInput("xvar", "X-axis variable", axis_vars, selected = "LS_YR"),
     selectInput("yvar", "Y-axis variable", axis_vars, selected = "CTTD_TOT_RPTD_A"),
-    tags$small(paste0("Note: The total loss is up to current reporting period"))
+    tags$small(paste0("Note: The total loss is up to current reporting period. ",
+                      "The axis variables inputs fields do not work ",
+                      "when 'Summary' tab is selected."
+               )
+    )
   ),
 mainPanel(
   tabsetPanel(
     tabPanel("Plot",ggvisOutput("plot1")),
-    tabPanel("Summary",ggvisOutput("plot2")),
+    tabPanel("Summary",
+             fluidRow(
+               splitLayout(cellWidths = c("50%", "50%"), 
+                           ggvisOutput("plot2"), 
+                           ggvisOutput("plot3")
+               )
+             )
+    ),
     tabPanel("Table", dataTableOutput("table1"))
   ),
   wellPanel(
-    span("Number of claims selected:", textOutput("num_fin_records"))
+    fluidRow(
+      splitLayout(cellWidths = c("30%","30%"),
+                  span("Number of claims selected:", textOutput("num_fin_records")),
+                  span("Average loss: ", textOutput("avg_loss"))
+                  )
+    )
   )
 )
 ))

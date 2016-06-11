@@ -52,7 +52,9 @@ shinyServer(function(input, output, session) {
   fin_records_sum <- reactive({
     # note that to pass results to this reactive function
     # we use fin_records() 
+    
     s <- group_by(fin_records(),LS_YR)
+
     s <- summarise(s,
                    NUMCLM_PER_YR = n(),
                    AVGLS_PER_YR = mean(CTTD_TOT_RPTD_A,na.rm = TRUE),
@@ -95,15 +97,32 @@ shinyServer(function(input, output, session) {
         fillOpacity := 0.2, fillOpacity.hover := 0.5, 
         stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
       add_tooltip(records_tooltip_points, "hover") %>%
-      add_axis("x", title = xvar_name,format="####") %>%
-      add_axis("y", title = yvar_name) %>%
-      add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%  
-      scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>% 
-      set_options(width = 750, height = 600)
+      add_axis("x", 
+               title = xvar_name,
+               format="####",
+               subdivide = 1,
+               values = seq(input$loss_year[1],input$loss_year[2],by=1),
+               tick_size_major = 10,
+               tick_size_minor = 5
+      ) %>%
+      add_axis("y", 
+               title = yvar_name,
+               title_offset = 65
+      ) %>%
+      add_legend("stroke", 
+                 title = "Claim file status", 
+                 values = c("Open", "Closed")
+                 ) %>%  
+      scale_nominal("stroke", 
+                    domain = c("Open", "Closed"),
+                    range = c( "red","#aaa")
+                    ) %>% 
+      set_options(width = 800, height = 550)
   })
-
   plot1 %>% bind_shiny("plot1")
   
+  
+  # plot2 the frequency bar chart
   plot2 <- reactive({
     # Lables for axes
     xvar_name <- "Loss Year"
@@ -116,21 +135,74 @@ shinyServer(function(input, output, session) {
       ggvis(x = xvar, y = yvar) %>%
       layer_bars(opacity := 0.5,fill := "#3299CC") %>%
       #add_tooltip(records_tooltip, "hover") %>%
-      add_axis("x", title = xvar_name,format="####",grid=FALSE) %>%
-      add_axis("y", title = yvar_name) %>%
+      add_axis("x", 
+               title = xvar_name,
+               title_offset = 50,
+               format="####",
+               subdivide = 1,
+               values = seq(input$loss_year[1],input$loss_year[2],by=1),
+               tick_size_major = 10,
+               tick_size_minor = 5,
+               properties = axis_props(labels = list(angle = -45, align = "right")),
+               grid=FALSE
+      ) %>%
+      add_axis("y", 
+               title = yvar_name,
+               title_offset = 50
+      ) %>%
       # add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%
       # scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>%
-      set_options(width = 450, height = 500)
+      set_options(width = 450, height = 580)
   })
-  
   plot2 %>% bind_shiny("plot2")
   
+  # plot3: points line chart that shows average loss per year
+  plot3 <- reactive({
+    # Lables for axes
+    xvar_name <- "Loss Year"
+    yvar_name <- "Number of claims"
+    
+    xvar <- prop("x", as.symbol("LS_YR"))
+    yvar <- prop("y", as.symbol("AVGLS_PER_YR"))
+    
+    fin_records_sum %>%
+      ggvis(x = xvar, y = yvar) %>%
+      layer_lines() %>%
+      layer_points(stroke := "#FFA500",
+                   fill := "#FFA500") %>%
+      #add_tooltip(records_tooltip, "hover") %>%
+      add_axis("x", 
+               title = xvar_name,
+               title_offset = 50,
+               properties = axis_props(labels = list(angle = -45, align = "right")),
+               format="####",
+               values = seq(input$loss_year[1],input$loss_year[2],by=1),
+               tick_size_major = 10,
+               tick_size_minor = 5,
+               grid=TRUE
+               ) %>%
+      add_axis("y", 
+               title = yvar_name,
+               title_offset = 60,
+               orient = "right") %>%
+      # add_legend("stroke", title = "Claim file status", values = c("Open", "Closed")) %>%
+      # scale_nominal("stroke", domain = c("Open", "Closed"),range = c( "red","#aaa")) %>%
+      set_options(width = 430, height = 580)
+  })
+  plot3 %>% bind_shiny("plot3")
+  
+  
   output$num_fin_records<- renderText({ nrow(fin_records()) })
+  output$avg_loss <- renderText(paste0("$ ",
+                       as.character(
+                         format(ceiling(sum(fin_records()$CTTD_TOT_RPTD_A)/nrow(fin_records())),big.mark = ",")
+                       ))
+                     )
   
   # note that on ui.R we use dataTableOutput$table1
   output$table1 <- renderDataTable(fin_records(),
                                    options = list(
                                      pageLength = 15
                                    )
-  )
+                   )
 })

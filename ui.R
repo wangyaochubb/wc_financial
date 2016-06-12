@@ -51,9 +51,10 @@ mainPanel(
   ),
   wellPanel(
     fluidRow(
-      splitLayout(cellWidths = c("30%","30%"),
-                  span("Number of claims selected:", textOutput("num_fin_records")),
-                  span("Average loss: ", textOutput("avg_loss"))
+      splitLayout(cellWidths = c("25%","20%","55%"),
+                  span("Claims selected:", textOutput("num_fin_records")),
+                  span("Average loss: ", textOutput("avg_loss")),
+                  span("Top insured names:",textOutput("top_names"))
                   )
     )
   )

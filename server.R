@@ -68,6 +68,21 @@ shinyServer(function(input, output, session) {
     s <- select(s,LS_YR,NUMCLM_PER_YR,AVGLS_PER_YR,AVGDAYS_LS_RPTD,AVG_LS)
     s
   })
+  
+  # get top 5 (or less) names in NA_INSD_NA
+  top_names <- reactive({
+    t <- group_by(fin_records(),NA_INSD_NA)
+    t <- summarise(t, 
+                   INSD_NA_FREQ = n())%>%arrange(desc(INSD_NA_FREQ))
+    t <- as.data.frame(t)
+    t <- select(t,NA_INSD_NA)
+    if (nrow(t)>5){
+      t <- head(t,5)
+    } else{
+      t <- head(t,nrow(t))
+    }
+    t
+  })
 
   # Function for generating tooltip text for points chart
   records_tooltip_points <- function(x) {
@@ -96,19 +111,24 @@ shinyServer(function(input, output, session) {
     xvar <- prop("x", as.symbol(input$xvar))
     yvar <- prop("y", as.symbol(input$yvar))
 
+    
+    
     fin_records %>%
       ggvis(x = xvar, y = yvar) %>%
-      layer_points(size := 50, size.hover := 200,
+      layer_points(size := 80, size.hover := 250,
         fillOpacity := 0.2, fillOpacity.hover := 0.5, 
         stroke = ~CLM_FILE_STAT_NA, key := ~CLM_SRC_SYS_UNQ_ID) %>%
       add_tooltip(records_tooltip_points, "hover") %>%
       add_axis("x", 
                title = xvar_name,
                format="####",
-               subdivide = 1,
-               values = seq(input$loss_year[1],input$loss_year[2],by=1),
-               tick_size_major = 10,
-               tick_size_minor = 5
+               #subdivide = 1,
+               values = seq(min(fin_records()$LS_YR),
+                            max(fin_records()$LS_YR),
+                            by=1
+               ),
+               tick_size_major = 10
+               #tick_size_minor = 5
       ) %>%
       add_axis("y", 
                title = yvar_name,
@@ -145,7 +165,9 @@ shinyServer(function(input, output, session) {
                title_offset = 50,
                format="####",
                subdivide = 1,
-               values = seq(input$loss_year[1],input$loss_year[2],by=1),
+               values = seq(min(fin_records()$LS_YR),
+                            max(fin_records()$LS_YR),
+                            by=1),
                tick_size_major = 10,
                tick_size_minor = 5,
                properties = axis_props(labels = list(angle = -45, align = "right")),
@@ -184,7 +206,9 @@ shinyServer(function(input, output, session) {
                title_offset = 50,
                properties = axis_props(labels = list(angle = -45, align = "right")),
                format="####",
-               values = seq(input$loss_year[1],input$loss_year[2],by=1),
+               values = seq(min(fin_records()$LS_YR),
+                            max(fin_records()$LS_YR),
+                            by=1),
                tick_size_major = 10,
                tick_size_minor = 5,
                grid=TRUE
@@ -199,6 +223,8 @@ shinyServer(function(input, output, session) {
   })
   plot3 %>% bind_shiny("plot3")
   # other ouput fields
+                  
+  output$top_names <- renderText({paste(top_names()$NA_INSD_NA,sep = ", ")})
   output$num_fin_records<- renderText({ nrow(fin_records()) })
   output$avg_loss <- renderText(paste0("$ ",
                        as.character(

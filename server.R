@@ -3,7 +3,7 @@ library(dplyr)
 if (FALSE) library(RSQLite)
 
 # Set up handles to database tables on app start
-db <- src_sqlite("H:\\2016WC Unbundled Oversight\\shiny\\xiaoyun\\gbwc_fin.sqlite")
+db <- src_sqlite("C:\\Users\\u041018\\Documents\\RShiny\\wc_financial\\gbwc_fin.sqlite")
 CPfindb <- tbl(db, "gbwc_financial")
 
 # select specified columns
@@ -60,7 +60,12 @@ shinyServer(function(input, output, session) {
                    AVGLS_PER_YR = mean(CTTD_TOT_RPTD_A,na.rm = TRUE),
                    AVGDAYS_LS_RPTD = mean(DAYS_LS_RPTD,na.rm = TRUE)
     )
-    s <- select(s,LS_YR,NUMCLM_PER_YR,AVGLS_PER_YR,AVGDAYS_LS_RPTD)
+    s <- as.data.frame(s)
+    # create new column
+    s$AVG_LS <- numeric(nrow(s))
+    s$AVG_LS <- mean(s$AVGLS_PER_YR)
+    
+    s <- select(s,LS_YR,NUMCLM_PER_YR,AVGLS_PER_YR,AVGDAYS_LS_RPTD,AVG_LS)
     s
   })
 
@@ -158,9 +163,10 @@ shinyServer(function(input, output, session) {
   
   # plot3: points line chart that shows average loss per year
   plot3 <- reactive({
+    
     # Lables for axes
     xvar_name <- "Loss Year"
-    yvar_name <- "Number of claims"
+    yvar_name <- "Average Loss"
     
     xvar <- prop("x", as.symbol("LS_YR"))
     yvar <- prop("y", as.symbol("AVGLS_PER_YR"))
@@ -171,6 +177,8 @@ shinyServer(function(input, output, session) {
       layer_points(stroke := "#FFA500",
                    fill := "#FFA500") %>%
       #add_tooltip(records_tooltip, "hover") %>%
+      # add a horizontal line represents the grand mean
+      layer_paths(x=~LS_YR,y=~AVG_LS,stroke := "green",fill :="green")%>%
       add_axis("x", 
                title = xvar_name,
                title_offset = 50,
@@ -190,8 +198,7 @@ shinyServer(function(input, output, session) {
       set_options(width = 430, height = 580)
   })
   plot3 %>% bind_shiny("plot3")
-  
-  
+  # other ouput fields
   output$num_fin_records<- renderText({ nrow(fin_records()) })
   output$avg_loss <- renderText(paste0("$ ",
                        as.character(
